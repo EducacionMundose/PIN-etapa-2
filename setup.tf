@@ -83,53 +83,8 @@ resource "aws_security_group" "sg" {
   }
 }
 
-# Crear Instancia EC2
-resource "aws_instance" "webserver" {
-  ami           = "ami-00c39f71452c08778" 
-  instance_type = "t2.micro"
-  subnet_id     = aws_subnet.subnet.id
-  security_groups = [aws_security_group.sg.name]
 
-  # Script de inicio para instalar Apache
-  user_data = <<-EOF
-              #!/bin/bash
-              sudo apt update -y
-              sudo apt install apache2 -y
-              sudo systemctl start apache2
-              sudo systemctl enable apache2
-              EOF
 
-  tags = {
-    Name = "Apache Web Server"
-  }
-}
-
-resource "aws_s3_bucket" "my-bucket-mundoe" {
-  bucket = "my-bucket-mundoe"
-  acl    = "private"
-
-  tags = {
-    Name        = "MiAplicacionBucket"
-    Environment = "Production"
-  }
-}
-
-resource "aws_dynamodb_table" "my-table-mundoe" {
-  name         = "my-table-mundoe"
-  billing_mode = "PAY_PER_REQUEST"
-
-  hash_key = "id"
-
-  attribute {
-    name = "id"
-    type = "S"
-  }
-
-  tags = {
-    Name        = "MiAplicacionTabla"
-    Environment = "Production"
-  }
-}
 
 # Output de la IP pública de la instancia EC2
 output "Webserver-Public-IP" {
