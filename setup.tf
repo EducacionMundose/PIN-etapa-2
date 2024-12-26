@@ -2,14 +2,7 @@ provider "aws" {
   region = "us-east-1"
 }
 
-
-
-#Get Linux AMI ID using SSM Parameter endpoint in us-east-1
-#data "aws_ssm_parameter" "webserver-ami" {
-#  name = "/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2"
-#}
-
-#Create VPC in us-east-1
+# Crear VPC
 resource "aws_vpc" "vpc" {
   cidr_block           = "10.0.0.0/16"
   enable_dns_support   = true
@@ -17,15 +10,14 @@ resource "aws_vpc" "vpc" {
   tags = {
     Name = "terraform-vpc"
   }
-
 }
 
-#Create IGW in us-east-1
+# Crear IGW
 resource "aws_internet_gateway" "igw" {
   vpc_id = aws_vpc.vpc.id
 }
 
-#Get main route table to modify
+# Obtener la tabla de enrutamiento principal
 data "aws_route_table" "main_route_table" {
   filter {
     name   = "association.main"
@@ -36,7 +28,8 @@ data "aws_route_table" "main_route_table" {
     values = [aws_vpc.vpc.id]
   }
 }
-#Create route table in us-east-1
+
+# Crear ruta para el acceso a Internet
 resource "aws_default_route_table" "internet_route" {
   default_route_table_id = data.aws_route_table.main_route_table.id
   route {
@@ -48,24 +41,24 @@ resource "aws_default_route_table" "internet_route" {
   }
 }
 
-#Get all available AZ's in VPC for master region
+# Obtener las AZ disponibles
 data "aws_availability_zones" "azs" {
   state = "available"
 }
 
-#Create subnet # 1 in us-east-1
+# Crear Subnet
 resource "aws_subnet" "subnet" {
   availability_zone = element(data.aws_availability_zones.azs.names, 0)
   vpc_id            = aws_vpc.vpc.id
   cidr_block        = "10.0.1.0/24"
 }
 
-
-#Create SG for allowing TCP/80 & TCP/22
+# Crear Grupo de Seguridad (Permitir TCP/80 & TCP/22)
 resource "aws_security_group" "sg" {
   name        = "sg"
   description = "Allow TCP/80 & TCP/22"
   vpc_id      = aws_vpc.vpc.id
+
   ingress {
     description = "Allow SSH traffic"
     from_port   = 22
@@ -73,13 +66,15 @@ resource "aws_security_group" "sg" {
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
   ingress {
-    description = "allow traffic from TCP/80"
+    description = "Allow HTTP traffic"
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
   egress {
     from_port   = 0
     to_port     = 0
@@ -88,6 +83,28 @@ resource "aws_security_group" "sg" {
   }
 }
 
+# Crear Instancia EC2
+resource "aws_instance" "webserver" {
+  ami           = "ami-00c39f71452c08778" 
+  instance_type = "t2.micro"
+  subnet_id     = aws_subnet.subnet.id
+  security_groups = [aws_security_group.sg.name]
+
+  # Script de inicio para instalar Apache
+  user_data = <<-EOF
+              #!/bin/bash
+              sudo apt update -y
+              sudo apt install apache2 -y
+              sudo systemctl start apache2
+              sudo systemctl enable apache2
+              EOF
+
+  tags = {
+    Name = "Apache Web Server"
+  }
+}
+
+# Output de la IP pública de la instancia EC2
 output "Webserver-Public-IP" {
   value = aws_instance.webserver.public_ip
 }
